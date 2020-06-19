@@ -1,0 +1,456 @@
+@@ -0,0 +1,23 @@
+APP_ENV=local
+APP_DEBUG=true
+APP_KEY=SomeRandomString
+
+DB_HOST=localhost
+DB_DATABASE=homestead
+DB_USERNAME=homestead
+DB_PASSWORD=secret
+
+CACHE_DRIVER=file
+SESSION_DRIVER=file
+QUEUE_DRIVER=sync
+
+REDIS_HOST=localhost
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+
+MAIL_DRIVER=smtp
+MAIL_HOST=mailtrap.io
+MAIL_PORT=2525
+MAIL_USERNAME=null
+MAIL_PASSWORD=null
+MAIL_ENCRYPTION=null
+3 .gitattributes
+@@ -0,0 +1,3 @@
+* text=auto
+*.css linguist-vendored
+*.less linguist-vendored
+6 .gitignore
+@@ -0,0 +1,6 @@
+/vendor
+/.idea
+/node_modules
+Homestead.yaml
+Homestead.json
+.env
+33 app/Console/Commands/Inspire.php
+@@ -0,0 +1,33 @@
+<?php
+
+namespace App\Console\Commands;
+
+use Illuminate\Console\Command;
+use Illuminate\Foundation\Inspiring;
+
+class Inspire extends Command
+{
+    /**
+     * The name and signature of the console command.
+     *
+     * @var string
+     */
+    protected $signature = 'inspire';
+
+    /**
+     * The console command description.
+     *
+     * @var string
+     */
+    protected $description = 'Display an inspiring quote';
+
+    /**
+     * Execute the console command.
+     *
+     * @return mixed
+     */
+    public function handle()
+    {
+        $this->comment(PHP_EOL.Inspiring::quote().PHP_EOL);
+    }
+}
+30 app/Console/Kernel.php
+@@ -0,0 +1,30 @@
+<?php
+
+namespace App\Console;
+
+use Illuminate\Console\Scheduling\Schedule;
+use Illuminate\Foundation\Console\Kernel as ConsoleKernel;
+
+class Kernel extends ConsoleKernel
+{
+    /**
+     * The Artisan commands provided by your application.
+     *
+     * @var array
+     */
+    protected $commands = [
+        Commands\Inspire::class,
+    ];
+
+    /**
+     * Define the application's command schedule.
+     *
+     * @param  \Illuminate\Console\Scheduling\Schedule  $schedule
+     * @return void
+     */
+    protected function schedule(Schedule $schedule)
+    {
+        $schedule->command('inspire')
+                 ->hourly();
+    }
+}
+8 app/Events/Event.php
+@@ -0,0 +1,8 @@
+<?php
+
+namespace App\Events;
+
+abstract class Event
+{
+    //
+}
+51 app/Exceptions/Handler.php
+@@ -0,0 +1,51 @@
+<?php
+
+namespace App\Exceptions;
+
+use Exception;
+use Illuminate\Auth\Access\AuthorizationException;
+use Illuminate\Database\Eloquent\ModelNotFoundException;
+use Symfony\Component\HttpKernel\Exception\HttpException;
+use Illuminate\Foundation\Validation\ValidationException;
+use Symfony\Component\HttpKernel\Exception\NotFoundHttpException;
+use Illuminate\Foundation\Exceptions\Handler as ExceptionHandler;
+
+class Handler extends ExceptionHandler
+{
+    /**
+     * A list of the exception types that should not be reported.
+     *
+     * @var array
+     */
+    protected $dontReport = [
+        AuthorizationException::class,
+        HttpException::class,
+        ModelNotFoundException::class,
+        ValidationException::class,
+    ];
+
+    /**
+     * Report or log an exception.
+     *
+     * This is a great spot to send exceptions to Sentry, Bugsnag, etc.
+     *
+     * @param  \Exception  $e
+     * @return void
+     */
+    public function report(Exception $e)
+    {
+        return parent::report($e);
+    }
+
+    /**
+     * Render an exception into an HTTP response.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \Exception  $e
+     * @return \Illuminate\Http\Response
+     */
+    public function render($request, Exception $e)
+    {
+        return parent::render($request, $e);
+    }
+}
+13 app/Http/Controllers/Controller.php
+@@ -0,0 +1,13 @@
+<?php
+
+namespace App\Http\Controllers;
+
+use Illuminate\Foundation\Bus\DispatchesJobs;
+use Illuminate\Routing\Controller as BaseController;
+use Illuminate\Foundation\Validation\ValidatesRequests;
+use Illuminate\Foundation\Auth\Access\AuthorizesRequests;
+
+class Controller extends BaseController
+{
+    use AuthorizesRequests, DispatchesJobs, ValidatesRequests;
+}
+51 app/Http/Controllers/UserController.php
+@@ -0,0 +1,51 @@
+<?php
+namespace App\Http\Controllers;
+
+use App\User;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Auth;
+
+class UserController extends Controller
+{
+    public function getDashboard()
+    {
+        return view('dashboard');
+    }
+
+    public function postSignUp(Request $request)
+    {
+        $this->validate($request, [
+            'email' => 'required|email|unique:users',
+            'first_name' => 'required|max:120',
+            'password' => 'required|min:4'
+        ]);
+
+        $email = $request['email'];
+        $first_name = $request['first_name'];
+        $password = bcrypt($request['password']);
+
+        $user = new User();
+        $user->email = $email;
+        $user->first_name = $first_name;
+        $user->password = $password;
+
+        $user->save();
+
+        Auth::login($user);
+
+        return redirect()->route('dashboard');
+    }
+
+    public function postSignIn(Request $request)
+    {
+        $this->validate($request, [
+            'email' => 'required',
+            'password' => 'required'
+        ]);
+
+        if (Auth::attempt(['email' => $request['email'], 'password' => $request['password']])) {
+            return redirect()->route('dashboard');
+        }
+        return redirect()->back();
+    }
+}
+52 app/Http/Kernel.php
+@@ -0,0 +1,52 @@
+<?php
+
+namespace App\Http;
+
+use Illuminate\Foundation\Http\Kernel as HttpKernel;
+
+class Kernel extends HttpKernel
+{
+    /**
+     * The application's global HTTP middleware stack.
+     *
+     * These middleware are run during every request to your application.
+     *
+     * @var array
+     */
+    protected $middleware = [
+        \Illuminate\Foundation\Http\Middleware\CheckForMaintenanceMode::class,
+    ];
+
+    /**
+     * The application's route middleware groups.
+     *
+     * @var array
+     */
+    protected $middlewareGroups = [
+        'web' => [
+            \App\Http\Middleware\EncryptCookies::class,
+            \Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse::class,
+            \Illuminate\Session\Middleware\StartSession::class,
+            \Illuminate\View\Middleware\ShareErrorsFromSession::class,
+            \App\Http\Middleware\VerifyCsrfToken::class,
+        ],
+
+        'api' => [
+            'throttle:60,1',
+        ],
+    ];
+
+    /**
+     * The application's route middleware.
+     *
+     * These middleware may be assigned to groups or used individually.
+     *
+     * @var array
+     */
+    protected $routeMiddleware = [
+        'auth' => \App\Http\Middleware\Authenticate::class,
+        'auth.basic' => \Illuminate\Auth\Middleware\AuthenticateWithBasicAuth::class,
+        'guest' => \App\Http\Middleware\RedirectIfAuthenticated::class,
+        'throttle' => \Illuminate\Routing\Middleware\ThrottleRequests::class,
+    ];
+}
+30 app/Http/Middleware/Authenticate.php
+@@ -0,0 +1,30 @@
+<?php
+
+namespace App\Http\Middleware;
+
+use Closure;
+use Illuminate\Support\Facades\Auth;
+
+class Authenticate
+{
+    /**
+     * Handle an incoming request.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \Closure  $next
+     * @param  string|null  $guard
+     * @return mixed
+     */
+    public function handle($request, Closure $next, $guard = null)
+    {
+        if (Auth::guard($guard)->guest()) {
+            if ($request->ajax()) {
+                return response('Unauthorized.', 401);
+            } else {
+                return redirect()->route('home');
+            }
+        }
+
+        return $next($request);
+    }
+}
+17 app/Http/Middleware/EncryptCookies.php
+@@ -0,0 +1,17 @@
+<?php
+
+namespace App\Http\Middleware;
+
+use Illuminate\Cookie\Middleware\EncryptCookies as BaseEncrypter;
+
+class EncryptCookies extends BaseEncrypter
+{
+    /**
+     * The names of the cookies that should not be encrypted.
+     *
+     * @var array
+     */
+    protected $except = [
+        //
+    ];
+}
+26 app/Http/Middleware/RedirectIfAuthenticated.php
+@@ -0,0 +1,26 @@
+<?php
+
+namespace App\Http\Middleware;
+
+use Closure;
+use Illuminate\Support\Facades\Auth;
+
+class RedirectIfAuthenticated
+{
+    /**
+     * Handle an incoming request.
+     *
+     * @param  \Illuminate\Http\Request  $request
+     * @param  \Closure  $next
+     * @param  string|null  $guard
+     * @return mixed
+     */
+    public function handle($request, Closure $next, $guard = null)
+    {
+        if (Auth::guard($guard)->check()) {
+            return redirect('/');
+        }
+
+        return $next($request);
+    }
+}
+17 app/Http/Middleware/VerifyCsrfToken.php
+@@ -0,0 +1,17 @@
+<?php
+
+namespace App\Http\Middleware;
+
+use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken as BaseVerifier;
+
+class VerifyCsrfToken extends BaseVerifier
+{
+    /**
+     * The URIs that should be excluded from CSRF verification.
+     *
+     * @var array
+     */
+    protected $except = [
+        //
+    ];
+}
+10 app/Http/Requests/Request.php
+@@ -0,0 +1,10 @@
+<?php
+
+namespace App\Http\Requests;
+
+use Illuminate\Foundation\Http\FormRequest;
+
+abstract class Request extends FormRequest
+{
+    //
+}
+46 app/Http/routes.php
+@@ -0,0 +1,46 @@
+<?php
+
+/*
+|--------------------------------------------------------------------------
+| Routes File
+|--------------------------------------------------------------------------
+|
+| Here is where you will register all of the routes in an application.
+| It's a breeze. Simply tell Laravel the URIs it should respond to
+| and give it the controller to call when that URI is requested.
+|
+*/
+
+
+/*
+|--------------------------------------------------------------------------
+| Application Routes
+|--------------------------------------------------------------------------
+|
+| This route group applies the "web" middleware group to every route
+| it contains. The "web" middleware group is defined in your HTTP
+| kernel and includes session state, CSRF protection, and more.
+|
+*/
+
+Route::group(['middleware' => ['web']], function () {
+    Route::get('/', function () {
+        return view('welcome');
+    })->name('home');
+
+    Route::post('/signup', [
+       'uses' => 'UserController@postSignUp',
+        'as' => 'signup'
+    ]);
+
+    Route::post('/signin', [
+        'uses' => 'UserController@postSignIn',
+        'as' => 'signin'
+    ]);
+
+    Route::get('/dashboard', [
+        'uses' => 'UserController@getDashboard',
+        'as' => 'dashboard',
+        'middleware' => 'auth'
+    ]);
+});
+21 app/Jobs/Job.php
+@@ -0,0 +1,21 @@
+<?php
+
+namespace App\Jobs;
+
+use Illuminate\Bus\Queueable;
+
+abstract class Job
